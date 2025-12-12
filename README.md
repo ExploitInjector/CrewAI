@@ -1,4 +1,4 @@
-Én külön futtattam az agenteket, a linken megadott helyrúl zip ből kicsogaoltam a data/raw mappába: https://www.kaggle.com/datasets/daniaherzalla/tii-ssrc-23
+Én külön futtattam az agenteket, a linken megadott helyről zip ből kicsomagoltam a data/raw mappába: https://www.kaggle.com/datasets/daniaherzalla/tii-ssrc-23
 Első Agent: data_cleaner.py megvártam a 8 millió soros csv végét, első agent 10-15 perc
 Második Agent: correlator_full.py kb 5-10 perc, még mindig elég nagy az adat 6 millió adat van
 Harmadik Agent: detector_rules ez már gyorsan lefut

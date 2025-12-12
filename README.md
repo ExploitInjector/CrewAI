@@ -2,9 +2,9 @@
 
 https://www.kaggle.com/datasets/daniaherzalla/tii-ssrc-23
 
-Első Agent: data_cleaner.py megvártam a 8 millió soros csv végét, első agent 10-15 perc
+Első Agent: data_cleaner.py megvártam a 8.6 millió soros csv végét, első agent 10-15 perc
 
-Második Agent: correlator_full.py kb 5-10 perc, még mindig elég nagy az adat 6 millió adat van
+Második Agent: correlator_full.py kb 5-10 perc, még mindig elég nagy az adat 8.6 millió van
 
 Harmadik Agent: detector_rules ez már gyorsan lefut
 

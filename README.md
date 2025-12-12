@@ -1,9 +1,15 @@
 Én külön futtattam az agenteket, a linken megadott helyről zip ből kicsomagoltam a data/raw mappába az ajánlott adatot: 
+
 https://www.kaggle.com/datasets/daniaherzalla/tii-ssrc-23
+
 Első Agent: data_cleaner.py megvártam a 8 millió soros csv végét, első agent 10-15 perc
+
 Második Agent: correlator_full.py kb 5-10 perc, még mindig elég nagy az adat 6 millió adat van
+
 Harmadik Agent: detector_rules ez már gyorsan lefut
+
 Negyedik Agent: explainer.py ez már gyorsan lefut
+
 Ötödik Agent: reportr.py ez már gyorsan lefut
 
 Ha minden egyben van, és letöltöd a rohadt nagy adatot, akkor lefuthat egymás után is az összes Agent a run_pipeline.py scriptel.

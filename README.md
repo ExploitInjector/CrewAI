@@ -10,7 +10,7 @@ Harmadik Agent: detector_rules ez már gyorsan lefut
 
 Negyedik Agent: explainer.py ez már gyorsan lefut
 
-Ötödik Agent: reportr.py ez már gyorsan lefut
+Ötödik Agent: reporter.py ez már gyorsan lefut
 
 Ha minden egyben van, és letöltöd a rohadt nagy adatot, akkor lefuthat egymás után is az összes Agent a run_pipeline.py scriptel.
 A végén ki kell dobjon egy ilyet:

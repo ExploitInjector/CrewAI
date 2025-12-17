@@ -1,0 +1,15 @@
+﻿# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Data (do not commit large datasets)
+data/raw/
+data/processed/
+runs/
+results/
+
+# OS / IDE
+.vscode/
+.DS_Store

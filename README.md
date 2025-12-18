@@ -1,4 +1,4 @@
- ids-crewai-project/
+ ids-crewai-project/ (nekem ez a helyi mappa neve)
 
  │
  

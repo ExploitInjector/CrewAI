@@ -1,7 +1,7 @@
 from crewai import Agent
 from langchain_openai import ChatOpenAI
 
-# Eszközök importálása a megadott struktúra szerint
+# Eszközök importálása
 from src.tools.datacleaner import clean_dataframe
 from src.tools.correlator import analyze_correlation
 from src.tools.detector import detect_attacks
@@ -19,7 +19,7 @@ class IDSCrewAgents:
     def data_cleaner_agent(self):
         return Agent(
             role="Szenior Adatmérnök",
-            goal="Futtasd le a 'clean_dataframe' eszközt a nyers logokon. Biztosítsd a tiszta adatbázist.",
+            goal="Futtasd le a 'clean_dataframe' eszközt a nyers logokon.",
             backstory="Kiberbiztonsági adatok előkészítésére szakosodott algoritmus vagy.",
             tools=[clean_dataframe],
             llm=local_llm,
@@ -42,7 +42,7 @@ class IDSCrewAgents:
         return Agent(
             role="SOC Incidens Kezelő",
             goal="Használd a 'detect_attacks' eszközt a konkrét támadások azonosításához.",
-            backstory="Az anomáliák és ismert támadási minták (DDoS, Brute Force) szakértője vagy.",
+            backstory="Az anomáliák és ismert támadási minták szakértője vagy.",
             tools=[detect_attacks],
             llm=local_llm,
             allow_delegation=False,

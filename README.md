@@ -1,4 +1,3 @@
-###############################################################################
 # IDS CrewAI PROJECT – EXPECTED LOCAL DIRECTORY STRUCTURE
 #
 # NOTE:
@@ -6,7 +5,6 @@
 # - Only the source code and configuration are versioned in Git.
 # - Large datasets and runtime artifacts are excluded via .gitignore.
 #
-###############################################################################
 #
 # ids-crewai-project/
 # │
@@ -56,6 +54,5 @@
 # ├── requirements.txt
 # └── README.md
 #
-###############################################################################
 # END OF STRUCTURE
-###############################################################################
+

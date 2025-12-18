@@ -15,19 +15,33 @@ ids-crewai-project/
 │   │   ├── agents.py           # 5 agent definíció
 
 │   │   ├── tasks.py            # task lánc
+
 │   │   └── crew_runner.py      # CrewAI indító
+
 │   │
+
 │   ├── tools/                  # Konkrét feldolgozó lépések
+
 │   │   ├── __init__.py
+
 │   │   ├── datacleaner.py      # 1. Adattisztító
+
 │   │   ├── correlator.py       # 2. Korrelátor
+
 │   │   ├── detector.py         # 3. Detektor
+
 │   │   ├── explainer.py        # 4. Magyarázó
+
 │   │   └── reporter.py         # 5. Tudósító
+
 │   │
+
 │   └── utils/                  # Segédfüggvények (opcionális)
+
 │       └── __init__.py
+
 │
+
 ├── data/                       # ADAT (lokálisan kötelező, Git-en nem)
 │   ├── raw/                    # Nyers bemenet
 │   │   ├── csv/

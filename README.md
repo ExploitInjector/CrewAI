@@ -1,11 +1,19 @@
 ids-crewai-project/
+
 │
+
 ├── src/                        # MINDEN Python kód
-│   ├── __init__.py
+
+├── __init__.py
+
 │   │
+
 │   ├── crew/                   # CrewAI-specifikus réteg (KÖTELEZŐ)
+
 │   │   ├── __init__.py
+
 │   │   ├── agents.py           # 5 agent definíció
+
 │   │   ├── tasks.py            # task lánc
 │   │   └── crew_runner.py      # CrewAI indító
 │   │

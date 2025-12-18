@@ -43,27 +43,51 @@ ids-crewai-project/
 │
 
 ├── data/                       # ADAT (lokálisan kötelező, Git-en nem)
+
 │   ├── raw/                    # Nyers bemenet
+
 │   │   ├── csv/
+
 │   │   │   └── data.csv        # ~5 GB flow CSV (NEM GIT)
+
 │   │   └── pcap/               # ~25 GB PCAP (opcionális)
+
 │   │
+
 │   └── processed/              # Feldolgozott adat
+
 │       └── cleaned.csv         # DataCleaner kimenet
+
 │
+
 ├── runs/                       # Futási artefaktumok
+
 │   ├── correlated.csv
+
 │   ├── detections.csv
+
 │   └── explanations.json
+
 │
+
 ├── results/                    # Ember által olvasható végtermék
+
 │   ├── incident_cards.json
+
 │   └── incident_cards.md
+
 │
+
 ├── tests/                      # (opcionális) tesztek
+
 │
+
 ├── .env                        # API kulcsok (NEM GIT)
+
 ├── .env.example                # minta (GIT)
+
 ├── .gitignore
+
 ├── requirements.txt
+
 └── README.md

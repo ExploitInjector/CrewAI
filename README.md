@@ -1,93 +1,61 @@
-ids-crewai-project/
-
-│
-
-├── src/                        # MINDEN Python kód
-
-├── __init__.py
-
-│   │
-
-│   ├── crew/                   # CrewAI-specifikus réteg (KÖTELEZŐ)
-
-│   │   ├── __init__.py
-
-│   │   ├── agents.py           # 5 agent definíció
-
-│   │   ├── tasks.py            # task lánc
-
-│   │   └── crew_runner.py      # CrewAI indító
-
-│   │
-
-│   ├── tools/                  # Konkrét feldolgozó lépések
-
-│   │   ├── __init__.py
-
-│   │   ├── datacleaner.py      # 1. Adattisztító
-
-│   │   ├── correlator.py       # 2. Korrelátor
-
-│   │   ├── detector.py         # 3. Detektor
-
-│   │   ├── explainer.py        # 4. Magyarázó
-
-│   │   └── reporter.py         # 5. Tudósító
-
-│   │
-
-│   └── utils/                  # Segédfüggvények (opcionális)
-
-│       └── __init__.py
-
-│
-
-├── data/                       # ADAT (lokálisan kötelező, Git-en nem)
-
-│   ├── raw/                    # Nyers bemenet
-
-│   │   ├── csv/
-
-│   │   │   └── data.csv        # ~5 GB flow CSV (NEM GIT)
-
-│   │   └── pcap/               # ~25 GB PCAP (opcionális)
-
-│   │
-
-│   └── processed/              # Feldolgozott adat
-
-│       └── cleaned.csv         # DataCleaner kimenet
-
-│
-
-├── runs/                       # Futási artefaktumok
-
-│   ├── correlated.csv
-
-│   ├── detections.csv
-
-│   └── explanations.json
-
-│
-
-├── results/                    # Ember által olvasható végtermék
-
-│   ├── incident_cards.json
-
-│   └── incident_cards.md
-
-│
-
-├── tests/                      # (opcionális) tesztek
-
-│
-
-├── .env                        # API kulcsok (NEM GIT)
-
-├── .env.example                # minta (GIT)
-
-├── .gitignore
-
-├── requirements.txt
-
-└── README.md
+###############################################################################
+# IDS CrewAI PROJECT – EXPECTED LOCAL DIRECTORY STRUCTURE
+#
+# NOTE:
+# - This structure MUST exist locally on the machine.
+# - Only the source code and configuration are versioned in Git.
+# - Large datasets and runtime artifacts are excluded via .gitignore.
+#
+###############################################################################
+#
+# ids-crewai-project/
+# │
+# ├── src/                        # ALL Python source code
+# │   ├── __init__.py
+# │   │
+# │   ├── crew/                   # CrewAI orchestration layer (MANDATORY)
+# │   │   ├── __init__.py
+# │   │   ├── agents.py           # Agent definitions (5 roles)
+# │   │   ├── tasks.py            # Task definitions and chaining
+# │   │   └── crew_runner.py      # Crew execution entrypoint
+# │   │
+# │   ├── tools/                  # Processing tools used by agents
+# │   │   ├── __init__.py
+# │   │   ├── datacleaner.py      # Step 1 – data cleaning
+# │   │   ├── correlator.py       # Step 2 – flow correlation
+# │   │   ├── detector.py         # Step 3 – rule-based detection
+# │   │   ├── explainer.py        # Step 4 – LLM / logic explanation
+# │   │   └── reporter.py         # Step 5 – human-readable output
+# │   │
+# │   └── utils/                  # Optional helper functions
+# │       └── __init__.py
+# │
+# ├── data/                       # DATA (LOCAL ONLY – NOT IN GIT)
+# │   ├── raw/
+# │   │   ├── csv/
+# │   │   │   └── data.csv        # ~5 GB labeled flow dataset
+# │   │   └── pcap/               # ~25 GB packet captures (optional)
+# │   │
+# │   └── processed/
+# │       └── cleaned.csv         # Output of datacleaner
+# │
+# ├── runs/                       # Runtime artifacts (LOCAL ONLY)
+# │   ├── correlated.csv
+# │   ├── detections.csv
+# │   └── explanations.json
+# │
+# ├── results/                    # Final human-readable outputs
+# │   ├── incident_cards.json
+# │   └── incident_cards.md
+# │
+# ├── tests/                      # Optional tests
+# │
+# ├── .env                        # API keys / secrets (NOT IN GIT)
+# ├── .env.example                # Environment template (IN GIT)
+# ├── .gitignore
+# ├── requirements.txt
+# └── README.md
+#
+###############################################################################
+# END OF STRUCTURE
+###############################################################################

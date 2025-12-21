@@ -1,0 +1,35 @@
+cleaning_task:
+      description: >
+        Run the cleaning tool on the raw data. 
+        Just call the tool, it knows the file paths automatically.
+      expected_output: >
+        A confirmation message that data/processed/cleaned.csv has been created.
+      agent: data_cleaner
+
+correlation_task:
+      description: >
+        Analyze the cleaned data: search for suspicious IP addresses and ports.
+      expected_output: >
+        A statistical summary of the network traffic.
+      agent: correlator
+
+detection_task:
+      description: >
+        Identify concrete attack attempts in the data.
+      expected_output: >
+        A list of detected incidents and their severity levels.
+      agent: detector
+
+explanation_task:
+      description: >
+        Interpret the identified attacks: what exactly happened on the network?
+      expected_output: >
+        A detailed technical description of the attack vectors.
+      agent: explainer
+
+reporting_task:
+      description: >
+        Generate the final report into PDF or Markdown format.
+      expected_output: >
+        Successful saving of the report and completion of the process.
+      agent: reporter

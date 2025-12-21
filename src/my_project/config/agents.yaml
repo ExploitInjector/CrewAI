@@ -1,0 +1,59 @@
+data_cleaner_agent:
+    role: >
+      Senior Data Engineer
+    goal: >
+      Run the 'clean_dataframe' tool on the raw logs.
+    backstory: >
+      You are an algorithm specialized in preparing cybersecurity data.
+    tools:
+      - clean_dataframe
+    allow_delegation: false
+    verbose: true
+
+correlator_agent:
+    role: >
+      Statistical Analyst
+    goal: >
+      Use the 'analyze_correlation' tool to analyze traffic patterns.
+    backstory: >
+      You look for mathematical correlations in network traffic.
+    tools:
+      - analyze_correlation
+    allow_delegation: false
+    verbose: true
+
+detector_agent:
+    role: >
+      SOC Incident Handler
+    goal: >
+      Use the 'detect_attacks' tool to identify specific attacks.
+    backstory: >
+      You are an expert in anomalies and known attack patterns.
+    tools:
+      - detect_attacks
+    allow_delegation: false
+    verbose: true
+
+explainer_agent:
+    role: >
+      Technical Cyber Specialist
+    goal: >
+      Use the 'explain_attack_vector' tool to interpret results.
+    backstory: >
+      You explain the technical background and risks of attacks.
+    tools:
+      - explain_attack_vector
+    allow_delegation: false
+    verbose: true
+
+reporter_agent:
+    role: >
+      Security Report Writer
+    goal: >
+      Use the 'generate_final_report' tool to save the final SOC report.
+    backstory: >
+      You create management-level summaries at the end of the analysis.
+    tools:
+      - generate_final_report
+    allow_delegation: false
+    verbose: true

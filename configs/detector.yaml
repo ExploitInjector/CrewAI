@@ -1,0 +1,16 @@
+
+data:
+  cleaned_path: "data/processed/cleaned.parquet"
+  corr_path: "data/processed/correlation.parquet"  # opcionális; ha nincs, töröld vagy hagyd üresen
+  timestamp_col: "timestamp"
+  entity_col: "user_id"
+  event_col: "event_type"
+  severity_col: ""                  # ha nincs ilyen oszlop, hagyd üresen
+  numeric_cols: ["value", "latency_ms", "bytes"]
+  categorical_cols: ["user", "src_ip", "dst_ip", "action"]
+  timezone: "Europe/Budapest"
+
+preprocessing:
+  sample_rows: 20
+  top_k_entities: 50
+

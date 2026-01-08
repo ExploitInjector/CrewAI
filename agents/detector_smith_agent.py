@@ -7,8 +7,8 @@ def build_detector_smith_agent() -> Agent:
         model="ollama/mistral",
         base_url="http://localhost:11434",
         temperature=0.2,
-        max_tokens=2048,
-        timeout=60  # ← 60 mp timeout (ha CrewAI/LLM támogatja a paramétert)
+        max_tokens=512,
+        timeout=240  # ← 60 mp timeout (ha CrewAI/LLM támogatja a paramétert)
 
     )
 

@@ -10,36 +10,39 @@ from typing import Optional, List
 
 import pyarrow.parquet as pq
 import pandas as pd
-# PyYAML a confighoz
 import yaml
 from crewai import Crew
 
 from agents.detector_smith_agent import build_detector_smith_agent
 from tasks.detector_smith_task import build_detector_smith_task
 
-# --- Logging beállítás ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("detector_main")
 
-# --- Project ROOT a sys.path-ban (opcionális) ---
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# --- Alapértelmezett path-ok (YAML felülírhatja) ---
-DEFAULT_CLEANED = Path("data/processed/cleaned.parquet")
-DEFAULT_CORR = Path("data/processed/correlation.parquet")
+#rugalmas defaultok (CSV preferencia, de bármely formátum mehet)
+DEFAULT_CLEANED_CANDIDATES = [
+    Path("data/processed/cleaned.parquet"),
+    Path("data/processed/cleaned.csv"),
+    Path("data/processed/cleaned.json"),
+]
+DEFAULT_CORR_CANDIDATES = [
+    Path("data/processed/correlation.csv"),
+    Path("data/processed/correlation.json"),
+    Path("data/processed/correlation.parquet"),
+    Path("data/processed/correlation_report.md"),
+]
+
 OUT_JSON = Path("data/processed/detections.json")
 OUT_MD = Path("data/processed/detector_report.md")
 
-CFG_PATH = Path("configs/detector.yaml")
+CFG_PATH = Path("config/detector.yaml")
 
 
 def _load_cfg() -> Optional[dict]:
-    """Betölti a configs/detector.yaml-t, ha létezik."""
     if CFG_PATH.exists():
         try:
             return yaml.safe_load(CFG_PATH.read_text(encoding="utf-8"))
@@ -53,70 +56,89 @@ def _ensure_output_dir() -> None:
     OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
 
 
-def _schema_columns(parquet_path: Path) -> List[str]:
-    """Parquet schema oszlopok gyors kiolvasása; pandas fallback."""
+def _schema_columns_any(path: Optional[Path]) -> List[str]:
+    """CSV/Parquet esetén oszlopok; JSON/MD/TXT esetén üres lista (szöveges/rekordos input)."""
+    if not path or not path.exists():
+        return []
+    suf = path.suffix.lower()
     try:
-        pf = pq.ParquetFile(parquet_path)
-        return list(pf.schema.names)
-    except Exception as e:  # egyes környezetekben több Arrow kivétel lehet
-        logger.warning("pyarrow schema olvasás nem sikerült (%s), fallback pandas-ra: %s", parquet_path, e)
-        # Fallback: pandas (ha a fájl tényleg olvasható Parquet)
-        try:
-            return list(pd.read_parquet(parquet_path).columns)
-        except Exception as e2:
-            logger.error("pandas read_parquet sem sikerült (%s): %s", parquet_path, e2)
-            raise
+        if suf == ".parquet":
+            try:
+                pf = pq.ParquetFile(path)
+                return list(pf.schema.names)
+            except Exception:
+                return list(pd.read_parquet(path).columns)
+        elif suf == ".csv":
+            return list(pd.read_csv(path, nrows=0).columns)
+        elif suf == ".json":
+            # JSON nem feltétlen táblás; a Detektor agent kontextusként kapja
+            return []
+        elif suf in (".md", ".txt"):
+            return []  # szöveges riport
+        else:
+            # Fallback: próbáljuk meg CSV-nek
+            return list(pd.read_csv(path, nrows=0).columns)
+    except Exception as e:
+        logger.warning("Schema olvasás sikertelen (%s): %s", path, e)
+        return []
+
+
+def _first_existing(paths: List[Path]) -> Optional[Path]:
+    for p in paths:
+        if p.exists():
+            return p
+    return None
 
 
 def main() -> None:
     _ensure_output_dir()
-
-    # --- Config beolvasása ---
     cfg = _load_cfg()
 
-    # --- Path-ok a YAML-ból vagy defaultból ---
-    cleaned_path = Path(cfg["data"]["cleaned_path"]) if (cfg and "data" in cfg and cfg["data"].get("cleaned_path")) else DEFAULT_CLEANED
-    corr_path = Path(cfg["data"]["corr_path"]) if (cfg and "data" in cfg and cfg["data"].get("corr_path")) else DEFAULT_CORR
+    # --- CLEANED kiválasztása ---
+    # Ha YAML-ban megadott path van, azt használjuk; ha nincs, próbáljuk a jelölteket.
+    cleaned_path: Optional[Path] = None
+    if cfg and "data" in cfg and cfg["data"].get("cleaned_path"):
+        cleaned_path = Path(cfg["data"]["cleaned_path"])
+    else:
+        cleaned_path = _first_existing(DEFAULT_CLEANED_CANDIDATES)
 
-    if not cleaned_path.exists():
-        raise RuntimeError(f"A CLEANED fájl nem található: {cleaned_path}")
+    # CLEANED nem kötelező a korrelátor-only üzemmódban, de ha van Parquet/CSV, validáljuk a sémát.
+    cleaned_cols = _schema_columns_any(cleaned_path)
+    if cleaned_path and not cleaned_cols and cleaned_path.suffix.lower() in (".csv", ".parquet"):
+        raise RuntimeError(f"A CLEANED fájl olvashatatlan vagy üres sémával: {cleaned_path}")
 
-    corr_exists = corr_path.exists()
+    # --- CORR kiválasztása (AUTOMATIKUS FALLBACK) ---
+    corr_path: Optional[Path] = None
+    if cfg and "data" in cfg and cfg["data"].get("corr_path"):
+        corr_path = Path(cfg["data"]["corr_path"])
+        if not corr_path.exists():
+            logger.info("YAML-ban megadott CORR fájl nem létezik (%s), fallback lista indul.", corr_path)
+            corr_path = _first_existing(DEFAULT_CORR_CANDIDATES)
+    else:
+        corr_path = _first_existing(DEFAULT_CORR_CANDIDATES)
+
+    corr_exists = bool(corr_path and corr_path.exists())
+    corr_cols = _schema_columns_any(corr_path) if corr_exists else []
+
     if not corr_exists:
-        logger.info("CORR fájl nincs megadva vagy nem található (%s) — correlator nélkül futunk.", corr_path)
+        logger.info("CORR fájl nincs megadva vagy nem található — Detektor korrelátor nélkül fut.")
+    else:
+        logger.info("CORR input: %s (cols=%s)", corr_path, len(corr_cols) if corr_cols else 0)
 
-    # --- Oszlopséma kiolvasás ---
-    cleaned_cols = _schema_columns(cleaned_path)
-    corr_cols: List[str] = []
-    if corr_exists:
-        try:
-            corr_cols = _schema_columns(corr_path)
-        except Exception as e:
-            logger.warning("CORR schema olvasás sikertelen (%s): %s", corr_path, e)
-            corr_cols = []
-
-    # --- Minimális validálás ---
-    if not cleaned_cols:
-        raise RuntimeError("A CLEANED Parquet fájl üres vagy nem olvasható oszlopokkal.")
-    # corr_cols lehet üres, ez nem fatális
-
-    # --- Agent (Ollama/mistral) ---
+    # --- Agent és Task ---
     agent = build_detector_smith_agent()
-
-    # --- Task (agent később hozzárendelve) ---
     task = build_detector_smith_task(
-        cleaned_path=str(cleaned_path),
-        corr_path=str(corr_path) if corr_exists else None,
+        cleaned_path=str(cleaned_path) if cleaned_path else "",
+        corr_path=str(corr_path) if corr_exists else "",
         output_json_path=str(OUT_JSON),
         output_md_path=str(OUT_MD),
     )
     task.agent = agent
 
-    # --- Crew és kickoff ---
     crew = Crew(agents=[agent], tasks=[task], verbose=True)
     result = crew.kickoff()
 
-    # --- Kimenet feldolgozás ---
+    # --- Kimenet feldolgozás (változatlan logika) ---
     json_part = None
     md_part = None
 
@@ -128,9 +150,8 @@ def main() -> None:
             parsed = json.loads(result)
             json_part = parsed
         except Exception:
-            md_part = result  # ha nem JSON, mehet Markdownba
+            md_part = result
     else:
-        # Bizonyos CrewAI verziók AgentResult-szerű objektumot adhatnak
         text = getattr(result, "raw", None) or getattr(result, "output", None) or str(result)
         try:
             parsed = json.loads(text)
@@ -138,22 +159,18 @@ def main() -> None:
         except Exception:
             md_part = text
 
-    # --- JSON mentés ---
     try:
         if json_part is not None:
             if isinstance(json_part, str):
-                # Nyers szöveg fallback — legyen artefakt
                 OUT_JSON.write_text(json_part, encoding="utf-8")
             else:
                 OUT_JSON.write_text(json.dumps(json_part, ensure_ascii=False, indent=2), encoding="utf-8")
         else:
-            # Ha nincs JSON, legalább üres lista
             OUT_JSON.write_text(json.dumps([], ensure_ascii=False), encoding="utf-8")
     except Exception as e:
         logger.warning("JSON mentés nem sikerült (%s): %s", OUT_JSON, e)
         OUT_JSON.write_text(json.dumps([], ensure_ascii=False), encoding="utf-8")
 
-    # --- MD mentés ---
     try:
         if md_part:
             OUT_MD.write_text(md_part, encoding="utf-8")

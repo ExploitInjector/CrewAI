@@ -1,43 +1,24 @@
-
 from crewai import Task
+
 
 def build_detector_smith_task(cleaned_path: str, corr_path: str,
                               output_json_path: str, output_md_path: str) -> Task:
-    """
-    Minimalista, CrewAI 0.7x kompatibilis Task.
-    A bemeneteket és a várt kimenetet egyértelműen leírjuk.
-    (Az agentet NEM adjuk át a konstruktorban – a main-ben task.agent = agent.)
-    """
     description = f"""
-Feladat: Általános detekciós riport készítése domainfüggetlen adathalmazra.
+Feladat: azonosítsd a legfontosabb biztonsági detekciókat a CLEANED és CORR adatok alapján.
 
-Források (kontextus):
-- CLEANED (parquet): {cleaned_path}
-- CORR (parquet, ha elérhető): {corr_path}
+Kimenetek:
+- JSON lista, minden elem mint:
+    {{"id": 1, "type": "...", "severity": "low|medium|high|critical", "evidence": "..."}}
+- Rövid magyar nyelvű szöveges magyarázat Markdownban.
 
-Feladatod:
-1) Azonosítsd a releváns detekciókat / eseményeket a rendelkezésre álló adatok alapján.
-2) Állíts elő JSON kimenetet, amit a rendszer fájlba ment:
-   - Mentési útvonal: {output_json_path}
-   - Struktúra javaslat: list[object], minden elem: {{
-       "id": str/int,
-       "type": str,               # pl. "burst", "range_violation", "stat_outlier", stb.
-       "severity": "low|medium|high|critical",
-       "evidence": str            # tömör magyar leírás, mire alapozod a detekciót
-     }}
-   - Ha nem tudsz szabályos JSON-t adni, adj nyers szöveget (artefakt), hogy a pipeline ne álljon le.
-3) Adj rövid magyar nyelvű magyarázatot Markdown formában:
-   - Mentési útvonal: {output_md_path}
-   - Fogalmazz tömören, a detekciókhoz rendelt indoklással.
-
-Megjegyzés:
-- A pipeline minimum-mentést alkalmaz: ha nincs érvényes JSON, üres listát ment ([]) és külön Markdown magyarázatot.
-- A Detektor célja: működő artefaktok előállítása, amire a Magyarázó és Tudósító rá tud építeni.
+Legyél tömör, strukturált, ne írj felesleges szöveget.
+Ha nem tudsz érvényes JSON-t adni: adj üres listát ([]), és külön rövid magyarázatot.
 """
+
     expected_output = "Detekciók JSON + magyar magyarázat Markdown."
 
     return Task(
         description=description,
         expected_output=expected_output,
-        verbose=True
+        verbose=True  # vagy verbose=False ha nem akarod kiíratni
     )

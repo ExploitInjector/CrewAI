@@ -1,0 +1,428 @@
+
+# config/detection_rules.yaml
+version: 1
+timezone: "Europe/Budapest"
+
+entity_col: "user_id"
+time:
+  business_hours:
+    start: "08:00"   # munkaidő kezdete
+    end:   "18:00"   # munkaidő vége
+
+defaults:
+  windows_minutes:
+    short: 5
+    medium: 15
+    long: 60
+  evidence_fields: ["timestamp", "user_id", "user", "src_ip", "dst_ip", "event_type", "action", "bytes", "latency_ms"]
+  # 500 MB bájtban:
+  thresholds:
+    exfil_bytes_critical: 524288000   # 500 MB
+    exfil_bytes_high:     262144000   # 250 MB
+    dos_latency_ms:       2000
+    flood_events:         1000        # 1000 esemény/ablak
+    scan_unique_dst_ip:   100
+    login_failed_count:   10
+    horizontal_bf_users:  20
+    new_account_spike_10m: 5
+
+rules:
+
+  # 1) Klasszikus bruteforce: sok sikertelen login rövid időn belül
+  - id: brute_force_login
+    name: "Bruteforce bejelentkezési kísérlet"
+    enabled: true
+    severity: "high"
+    description: "Túl sok sikertelen bejelentkezési kísérlet rövid ablakban ugyanattól a felhasználótól."
+    filter:
+      - field: "event_type"
+        op: "equals"
+        value: "login_failed"
+    group_by: ["user_id"]
+    window_minutes: 5
+    aggregate:
+      type: "count"
+    compare:
+      op: ">"
+      value_from_default: "login_failed_count"
+    output:
+      evidence_fields: ["user_id", "src_ip", "event_type"]
+      reason: "A felhasználónál a sikertelen bejelentkezések száma > 10 az utolsó 5 percben."
+
+  # 2) Sikeres bejelentkezés közvetlenül bruteforce után
+  - id: success_after_bruteforce
+    name: "Sikeres login bruteforce után"
+    enabled: true
+    severity: "critical"
+    description: "Sikeres bejelentkezés rövid időn belül sok sikertelen próbálkozás után (azonos user, azonos/ip-közeli forrás)."
+    sequence:
+      steps:
+        - filter:
+            - field: "event_type"
+              op: "equals"
+              value: "login_failed"
+          group_by: ["user_id", "src_ip"]
+          window_minutes: 10
+          aggregate:
+            type: "count"
+          compare:
+            op: ">="
+            value: 8
+        - filter:
+            - field: "event_type"
+              op: "equals"
+              value: "login_success"
+          group_by: ["user_id"]
+          window_minutes: 2
+      relation: "step2_after_step1"
+    output:
+      evidence_fields: ["user_id", "src_ip", "dst_ip"]
+      reason: "Sikeres login történt 2 percen belül ≥8 sikertelen után."
+
+  # 3) Horizontális bruteforce: sok különböző user ellenáll a same src_ip-től
+  - id: horizontal_bruteforce
+    name: "Horizontal bruteforce (credential stuffing)"
+    enabled: true
+    severity: "critical"
+    description: "Ugyanaz a forrás IP sok különböző felhasználóra próbál belépni és kudarcot vall."
+    filter:
+      - field: "event_type"
+        op: "equals"
+        value: "login_failed"
+    group_by: ["src_ip"]
+    window_minutes: 10
+    aggregate:
+      type: "unique_count"
+      field: "user_id"
+    compare:
+      op: ">"
+      value_from_default: "horizontal_bf_users"
+    output:
+      evidence_fields: ["src_ip"]
+      reason: "Azonos forrás IP ≥20 különböző felhasználóra próbált belépni 10 percen belül."
+
+  # 4) Dst-IP fanout (port/host scan proxy): sok különböző cél IP-hez kapcsolódás
+  - id: dst_ip_fanout_scan
+    name: "Cél IP fanout (szkennelés gyanúja)"
+    enabled: true
+    severity: "medium"
+    description: "Ugyanaz a forrás IP szokatlanul sok eltérő cél IP-hez próbál kapcsolódni rövid idő alatt."
+    filter:
+      - field: "action"
+        op: "equals"
+        value: "connect"
+    group_by: ["src_ip"]
+    window_minutes: 10
+    aggregate:
+      type: "unique_count"
+      field: "dst_ip"
+    compare:
+      op: ">"
+      value_from_default: "scan_unique_dst_ip"
+    output:
+      evidence_fields: ["src_ip"]
+      reason: "Azonos forrás IP >100 különböző cél IP-t ért el 10 perc alatt."
+
+  # 5) DoS gyanú: magas késleltetés + sok kérés
+  - id: dos_high_latency_burst
+    name: "DoS gyanú (késleltetés és kérés-tömeg)"
+    enabled: true
+    severity: "high"
+    description: "Magas késleltetés és nagy kérésvolumen ugyanattól a forrás IP-től, rövid időablakban."
+    filter:
+      - field: "latency_ms"
+        op: ">"
+        value_from_default: "dos_latency_ms"
+    group_by: ["src_ip", "dst_ip"]
+    window_minutes: 5
+    aggregate:
+      type: "count"
+    compare:
+      op: ">"
+      value: 100
+    output:
+      evidence_fields: ["src_ip", "dst_ip", "latency_ms"]
+      reason: "latency_ms > 2000 és > 100 esemény 5 perc alatt ugyanarra a célra."
+
+  # 6) Flood: extrém esemény ráta egy kapcsolatban
+  - id: connection_flood
+    name: "Flood (kapcsolat túlterhelés)"
+    enabled: true
+    severity: "critical"
+    description: "Azonos src_ip → dst_ip kapcsolatban extrém mennyiségű esemény rövid idő alatt."
+    filter:
+      - field: "action"
+        op: "in"
+        value: ["connect", "request"]
+    group_by: ["src_ip", "dst_ip"]
+    window_minutes: 5
+    aggregate:
+      type: "count"
+    compare:
+      op: ">"
+      value_from_default: "flood_events"
+    output:
+      evidence_fields: ["src_ip", "dst_ip"]
+      reason: "Azonos kapcsolatban >1000 esemény 5 perc alatt."
+
+  # 7) Adatszivárgás: nagy outbound forgalom (upload/outbound)
+  - id: data_exfiltration_spike_critical
+    name: "Adatszivárgás kritikus (nagy outbound bájt)"
+    enabled: true
+    severity: "critical"
+    description: "Rövid idő alatt jelentős kimenő adatforgalom (feltöltés/outbound)."
+    filter:
+      - field: "action"
+        op: "in"
+        value: ["upload", "outbound", "file_upload"]
+    group_by: ["user_id", "src_ip"]
+    window_minutes: 15
+    aggregate:
+      type: "sum"
+      field: "bytes"
+    compare:
+      op: ">"
+      value_from_default: "exfil_bytes_critical"
+    output:
+      evidence_fields: ["user_id", "src_ip", "bytes"]
+      reason: "Összesített kimenő bájt > 500 MB 15 perc alatt."
+
+  # 8) Adatszivárgás: nagy letöltési volumen (download)
+  - id: bulk_sensitive_download
+    name: "Nagy volumenű letöltés (bulk download)"
+    enabled: true
+    severity: "high"
+    description: "Rövid idő alatt szokatlanul nagy letöltési volumen."
+    filter:
+      - field: "action"
+        op: "in"
+        value: ["download", "file_download"]
+    group_by: ["user_id"]
+    window_minutes: 15
+    aggregate:
+      type: "sum"
+      field: "bytes"
+    compare:
+      op: ">"
+      value_from_default: "exfil_bytes_high"
+    output:
+      evidence_fields: ["user_id", "bytes"]
+      reason: "Letöltési összvolumen > 250 MB 15 perc alatt."
+
+  # 9) Ritka minta: érzékeny művelet munkaidőn kívül
+  - id: sensitive_action_outside_hours
+    name: "Érzékeny művelet munkaidőn kívül"
+    enabled: true
+    severity: "critical"
+    description: "Admin/config/privilege jellegű események munkaidőn kívül."
+    filter:
+      - field: "event_type"
+        op: "in"
+        value: ["admin_login", "privilege_change", "role_change", "config_change", "data_access"]
+      - field: "time_in_business_hours"
+        op: "equals"
+        value: false
+    group_by: ["user_id"]
+    window_minutes: 60
+    aggregate:
+      type: "count"
+    compare:
+      op: ">="
+      value: 1
+    output:
+      evidence_fields: ["user_id", "event_type", "timestamp"]
+      reason: "Érzékeny esemény történt munkaidőn kívül."
+
+  # 10) Account creation spike (rövid ablak)
+  - id: account_creation_spike_short
+    name: "Új fiókok rövid tüske (spike)"
+    enabled: true
+    severity: "high"
+    description: "Rövid idő alatt szokatlanul sok új fiók létrehozása."
+    filter:
+      - field: "event_type"
+        op: "equals"
+        value: "account_created"
+    group_by: ["src_ip"]
+    window_minutes: 10
+    aggregate:
+      type: "count"
+    compare:
+      op: ">"
+      value_from_default: "new_account_spike_10m"
+    output:
+      evidence_fields: ["src_ip"]
+      reason: "10 percen belül >5 új fiók jött létre azonos forrásból."
+
+  # 11) Account creation spike baseline-hoz képest (napi mozgóátlag)
+  - id: account_creation_spike_baseline
+    name: "Új fiókok napi baseline fölött"
+    enabled: true
+    severity: "medium"
+    description: "Az aktuális új fiók-ráta ≥3× a napi mozgóátlaghoz képest."
+    filter:
+      - field: "event_type"
+        op: "equals"
+        value: "account_created"
+    group_by: ["day"]
+    window_minutes: 1440
+    aggregate:
+      type: "count"
+    baseline:
+      type: "moving_average"
+      period_days: 7
+      factor: 3.0
+    output:
+      evidence_fields: ["day"]
+      reason: "Az új fiókok száma ≥3× a 7 napos MA-hoz viszonyítva."
+
+  # 12) Lateral movement gyanú: sok sikeres login különböző user ID-kre azonos src_ip-től
+  - id: lateral_movement_multi_users
+    name: "Laterális mozgás (több user sikeres login)"
+    enabled: true
+    severity: "high"
+    description: "Azonos forrás IP több különböző felhasználóra sikeres belépést ér el rövid időn belül."
+    filter:
+      - field: "event_type"
+        op: "equals"
+        value: "login_success"
+    group_by: ["src_ip"]
+    window_minutes: 15
+    aggregate:
+      type: "unique_count"
+      field: "user_id"
+    compare:
+      op: ">="
+      value: 3
+    output:
+      evidence_fields: ["src_ip"]
+      reason: "Azonos src_ip ≥3 különböző userre sikeres bejelentkezést ért el 15 perc alatt."
+
+  # 13) Új (first-seen) forrás IP nagy aktivitással
+  - id: new_src_ip_burst
+    name: "Új forrás IP burst"
+    enabled: true
+    severity: "medium"
+    description: "Felhasználónál első látásra megjelenő src_ip rövid idő alatt nagy aktivitással/forgalommal."
+    filter:
+      - field: "first_seen_src_ip_for_user"
+        op: "equals"
+        value: true
+    group_by: ["user_id", "src_ip"]
+    window_minutes: 10
+    aggregate:
+      type: "count"
+    compare:
+      op: ">"
+      value: 100
+    output:
+      evidence_fields: ["user_id", "src_ip"]
+    reason: "Új src_ip nagy aktivitással (count > 100) 10 percen belül."
+
+  # 14) Új (first-seen) cél IP nagy forgalommal
+  - id: new_dst_ip_high_bytes
+    name: "Új cél IP nagy bájtmennyiséggel"
+    enabled: true
+    severity: "high"
+    description: "Első látásra elért dst_ip felé rövid ablakban jelentős bájtforgalom."
+    filter:
+      - field: "first_seen_dst_ip_for_user"
+        op: "equals"
+        value: true
+    group_by: ["user_id", "dst_ip"]
+    window_minutes: 15
+    aggregate:
+      type: "sum"
+      field: "bytes"
+    compare:
+      op: ">"
+      value_from_default: "exfil_bytes_high"
+    output:
+      evidence_fields: ["user_id", "dst_ip", "bytes"]
+      reason: "Új dst_ip felé >250 MB 15 perc alatt."
+
+  # 15) Admin/config aktivitás szokatlan forrásból (first-seen src_ip)
+  - id: sensitive_from_new_src
+    name: "Érzékeny aktivitás új forrásból"
+    enabled: true
+    severity: "critical"
+    description: "Admin/config/privilege esemény új, korábban nem látott forrás IP-ről."
+    filter:
+      - field: "event_type"
+        op: "in"
+        value: ["admin_login", "privilege_change", "role_change", "config_change"]
+      - field: "first_seen_src_ip_for_user"
+        op: "equals"
+        value: true
+    group_by: ["user_id", "src_ip"]
+    window_minutes: 60
+    aggregate:
+      type: "count"
+    compare:
+      op: ">="
+      value: 1
+    output:
+      evidence_fields: ["user_id", "src_ip", "event_type"]
+      reason: "Érzékeny esemény új src_ip-ről."
+
+  # 16) Ritka akció a usernél (statisztikai ritkaság)
+  - id: rare_action_per_user
+    name: "Ritka akció – user szint"
+    enabled: true
+    severity: "medium"
+    description: "A felhasználónál ritkán előforduló action jelenik meg."
+    rarity:
+      scope: "user_id"
+      field: "action"
+      method: "frequency_zscore"   # zscore/frequency alapú ritkaság
+      history_days: 30
+      zscore_threshold: 3.0
+    output:
+      evidence_fields: ["user_id", "action"]
+      reason: "Az action ritkasága meghaladja a beállított küszöböt (z > 3)."
+
+  # 17) Alacsony késleltetés + nagy áteresztés (anomális throughput)
+  - id: low_latency_high_throughput
+    name: "Alacsony késleltetés, nagy áteresztés"
+    enabled: true
+    severity: "medium"
+    description: "Szokatlanul alacsony késleltetés mellett nagy adatforgalom rövid időablakban."
+    filter:
+      - field: "latency_ms"
+        op: "<"
+        value: 20
+    group_by: ["src_ip", "dst_ip"]
+    window_minutes: 1
+    aggregate:
+      type: "sum"
+      field: "bytes"
+    compare:
+      op: ">"
+      value: 104857600   # 100 MB
+    output:
+      evidence_fields: ["src_ip", "dst_ip", "bytes", "latency_ms"]
+      reason: "latency_ms < 20 ms és össz-bytes > 100 MB 1 perc alatt."
+
+  # 18) Időablak-politika sértés – érzékeny adathozzáférés munkaidőn kívül
+  - id: data_access_outside_window
+    name: "Időablak-politika sértés"
+    enabled: true
+    severity: "critical"
+    description: "Érzékeny adathozzáférés az engedélyezett időablakon kívül."
+    filter:
+      - field: "event_type"
+        op: "equals"
+        value: "data_access"
+      - field: "time_in_business_hours"
+        op: "equals"
+        value: false
+    group_by: ["user_id"]
+    window_minutes: 60
+    aggregate:
+      type: "count"
+    compare:
+      op: ">="
+      value: 1
+    output:
+      evidence_fields: ["user_id", "timestamp", "event_type"]
+      reason: "Adathozzáférés történt munkaidőn kívül."

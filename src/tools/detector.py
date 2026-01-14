@@ -84,7 +84,7 @@ def detect_incidents(input_path: str = "data/processed/cleaned.csv") -> str:
             "incidents": detections
         }
 
-        output_dir = "data/processed"
+        output_dir = "data/processed/"
         os.makedirs(output_dir, exist_ok=True)
 
         # JSON Jánosnak
